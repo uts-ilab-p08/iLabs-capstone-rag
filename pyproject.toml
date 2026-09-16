@@ -1,0 +1,20 @@
+[project]
+name = "rag"
+version = "0.1.0"
+description = "RAG layer for natural-language querying of MEVA surveillance footage (capstone 08-01)"
+readme = "README.md"
+authors = [
+    { name = "abychopda", email = "abychopda@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastembed>=0.8.0",
+    "psycopg[binary]>=3.3.5",
+    "python-dotenv>=1.2.3",
+    "qdrant-client>=1.19.0",
+    "rich>=15.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
