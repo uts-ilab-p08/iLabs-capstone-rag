@@ -23,7 +23,7 @@ TOP_K = 5
 # Hits below this cosine similarity are treated as unrelated and dropped.
 # Chosen from early testing: real matches scored ~0.72–0.82, a nonsense query
 # ~0.50–0.52. Recalibrate once we have a labelled query set.
-MIN_SCORE = 0.60
+MIN_SCORE = 0.5 #keep as 0.60
 
 
 # Loading the model takes a few seconds and opening Qdrant holds a file lock, so
