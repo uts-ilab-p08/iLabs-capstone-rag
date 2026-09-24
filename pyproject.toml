@@ -1,5 +1,5 @@
 [project]
-name = "rag"
+name = "ilabs-cctv-rag"
 version = "0.1.0"
 description = "RAG layer for natural-language querying of MEVA surveillance footage (capstone 08-01)"
 readme = "README.md"
