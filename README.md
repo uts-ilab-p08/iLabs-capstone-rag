@@ -62,6 +62,72 @@ No match → `"sources": []` and an answer saying no footage was found.
 
 To try it without the backend: `uv run scripts/ask.py "your question"`.
 
+The backend installs this package straight from a git tag in its
+`requirements.txt` (distribution name `ilabs-cctv-rag`, module name `rag`):
+
+```
+ilabs-cctv-rag @ git+https://github.com/uts-ilab-p08/iLabs-capstone-rag.git@vX.Y.Z
+```
+
+## Publishing a new version
+
+A version is just a git tag the backend pins to. There is no PyPI upload — pip
+clones the repo at that tag and builds the wheel itself, so **whatever is in the
+tagged commit is exactly what gets installed**.
+
+1. **Bump `version` in `pyproject.toml`** and refresh the lock file. Keep it equal
+   to the tag you are about to create (tag `v0.1.3` ↔ `version = "0.1.3"`), so
+   `pip show ilabs-cctv-rag` on the backend reports the real version.
+
+   ```bash
+   uv lock
+   ```
+
+2. **Check it installs from outside the repo.** `uv run` imports straight from
+   `src/` and never builds a wheel, so it can't catch packaging mistakes — this
+   can:
+
+   ```bash
+   rm -rf dist && uv build
+   python -m venv /tmp/rag-check && /tmp/rag-check/bin/pip install dist/*.whl
+   DATABASE_URL=postgresql://x:y@localhost/z \
+     /tmp/rag-check/bin/python -c "from rag.pipeline import answer_query; print('RAG package OK')"
+   ```
+
+   (`DATABASE_URL` only needs to be set, not valid — `rag.config` reads it at
+   import time.)
+
+3. **Commit and push first, then tag.** A tag points at a commit, not at your
+   working tree: tagging before committing publishes the *previous* commit.
+
+   ```bash
+   git add pyproject.toml uv.lock   # plus whatever changed
+   git commit -m "chore(release): v0.1.3"
+   git push origin main
+   git tag v0.1.3
+   git push origin v0.1.3
+   ```
+
+4. **Confirm the tag points at your commit** before telling anyone about it:
+
+   ```bash
+   git ls-remote --tags origin      # v0.1.3 must show the same hash as:
+   git rev-parse HEAD
+   ```
+
+5. **Bump the pin in the backend** (`requirements.txt`: `@v0.1.2` → `@v0.1.3`)
+   and reinstall there with `pip install -r requirements.txt`. Render picks the
+   new version up on its next deploy.
+
+Never move or delete a tag that's already published — the backend (or someone's
+venv) may already be pinned to it. If a release is broken, publish the next
+patch version instead.
+
+If a change alters the vector size (a different `EMBED_MODEL`/`EMBED_DIM`) or
+what gets indexed, the Qdrant collection has to be rebuilt with
+`scripts/index_events.py` against the remote Qdrant **before** the backend is
+bumped to that version.
+
 ## Layout
 
 ```
