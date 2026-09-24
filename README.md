@@ -46,19 +46,79 @@ response = answer_query(query)   # OUTPUT: dict to hand to the response API
 
 ```json
 {
-  "query": "person getting out of a car",
-  "answer": "natural-language answer",
+  "query": "did anyone get out of a vehicle?",
+  "answer": "Yes, a person got out of a vehicle in events [1], [2] and [3]...",
   "sources": [
-    {"score": 0.788, "description": "...", "event_name": "...", "video_id": "...",
-     "video_name": "...", "camera_id": "G336", "scene": "school",
-     "start_seconds": 40.0, "end_seconds": 52.0, "object_types": ["car", "person"],
-     "video_url": "https://..."}
-  ]
+    {
+      "score": 0.649,
+      "annotation": "A person in a dark jacket is seen exiting a white SUV...",
+      "video_id": "20c38d5f...",
+      "event_id": "b159b039...",
+
+      "event_name": "Person exits a white SUV",
+      "video_name": "2018-03-05.13-20-00.13-25-00.school.G336",
+      "camera_id": "G336",
+      "scene": "school",
+      "start_seconds": 41.844,
+      "end_seconds": 52.306,
+      "object_types": ["car", "person"],
+      "video_url": "https://..."
+    }
+  ],
+  "filters": {"scenes": ["hospital"], "cameras": [], "notes": []}
 }
 ```
 
-No match → `"sources": []` and an answer saying no footage was found.
-`answer` is placeholder text until the LLM provider is chosen; its shape won't change.
+- `sources` holds at most 5 events, best first. The first four fields are the
+  agreed contract; the rest are included because the frontend needs them to play
+  the exact moment without querying Postgres again. Drop them if unwanted.
+- `annotation` is the caption — bronze's `events.description`.
+- `answer` cites the events it used as `[1]`, `[2]`, matching `sources` order.
+- No match → `"sources": []` and an answer saying no footage was found.
+- If the LLM is unreachable, `answer` degrades to a plain summary rather than
+  raising, so the endpoint never fails because of the model.
+- `filters` is diagnostic: which metadata filter was applied and anything
+  deliberately ignored. Safe to drop from the API response, but useful for
+  telling the user "searched hospital only".
+
+## Metadata filtering
+
+A question naming a location or camera is filtered before ranking, so
+"what happened in the hospital clip" searches only hospital footage.
+
+Rule-based against the vocabulary actually present in the index (read from
+Qdrant, not Postgres — it must describe what is *searchable*). Handles
+synonyms (`campus`, `clinic`, `depot`) and rejects camera IDs that do not exist.
+
+Every rule errs toward filtering on nothing, because a wrong filter reports
+"no matching footage" about footage that exists, while a missed filter merely
+leaves results slightly noisy. So an ambiguous question ("was there a school
+bus?") and a negated one ("anything except the school") both fall back to
+unfiltered search, and say so in `filters.notes`.
+
+**When a filter matches, the similarity floor is dropped.** The filter is then
+the relevance signal. This is what makes scope questions work: no single event
+resembles "what happened in this clip", so every hospital event scores ~0.45-0.50
+and a fixed floor would discard all of them.
+
+Object types are deliberately **not** filtered on — the same vehicle appears as
+`car` in one event and `truck` in another, so filtering would drop correct results.
+
+## Choosing the LLM
+
+OpenRouter and Ollama both speak the OpenAI API, so the model is configuration,
+not code. Set three values in `.env`:
+
+| | OpenRouter (hosted) | Ollama (local) |
+|---|---|---|
+| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | `http://localhost:11434/v1` |
+| `LLM_MODEL` | `<vendor>/<model>` | `qwen3:4b` |
+| `LLM_API_KEY` | `sk-or-...` | leave empty |
+
+Leave `LLM_MODEL` empty to skip the LLM; answers fall back to a plain summary.
+
+Reasoning models spend tokens thinking before answering, so `max_tokens` is set
+generously (2000). Too low and they hit the cap mid-thought and return nothing.
 
 To try it without the backend: `uv run scripts/ask.py "your question"`.
 

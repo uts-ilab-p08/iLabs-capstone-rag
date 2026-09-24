@@ -93,6 +93,12 @@ def primary_label(label_details: list[dict] | None) -> str | None:
 
 def fetch_events() -> tuple[list[Event], int]:
     """Return (de-duplicated events, total event rows before de-duplication)."""
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "DATABASE_URL is not set, so events cannot be read from Supabase.\n"
+            "Copy .env.example to .env and fill it in. Note that only indexing "
+            "needs this — answering questions does not."
+        )
     with psycopg.connect(DATABASE_URL) as conn, conn.cursor() as cur:
         cur.execute(_TOTAL_EVENTS_SQL)
         total_rows = cur.fetchone()[0]
