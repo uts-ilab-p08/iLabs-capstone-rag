@@ -43,7 +43,9 @@ def point_id(event_id: str) -> str:
 
 def connect() -> QdrantClient:
     if QDRANT_URL:
-        return QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+        # The default timeout is a few seconds, which is fine for a container on
+        # localhost but not for a hosted cluster on the far side of the network.
+        return QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=60)
     QDRANT_LOCAL_PATH.mkdir(parents=True, exist_ok=True)
     return QdrantClient(path=str(QDRANT_LOCAL_PATH))
 
@@ -120,8 +122,17 @@ def count(client: QdrantClient) -> int:
     return client.count(collection_name=COLLECTION, exact=True).count
 
 
-def search(client: QdrantClient, vector: list[float], limit: int = 5) -> list[Hit]:
+def search(
+    client: QdrantClient,
+    vector: list[float],
+    limit: int = 5,
+    query_filter: models.Filter | None = None,
+) -> list[Hit]:
     response = client.query_points(
-        collection_name=COLLECTION, query=vector, limit=limit, with_payload=True
+        collection_name=COLLECTION,
+        query=vector,
+        limit=limit,
+        with_payload=True,
+        query_filter=query_filter,
     )
     return [Hit(score=p.score, payload=p.payload or {}) for p in response.points]

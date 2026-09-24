@@ -18,6 +18,7 @@ from rag.text import compose_text
 
 console = Console()
 BATCH_SIZE = 64
+UPLOAD_BATCH_SIZE = 100
 
 
 def main() -> None:
@@ -68,8 +69,14 @@ def main() -> None:
         )
         for event, text, vector in zip(events, texts, vectors)
     ]
-    store.upsert(client, points)
-    console.print(f"      upserted {len(points)} points")
+
+    # Upload in batches. One request carrying every point is fine against a
+    # local file, but over the network a large enough payload will time out or
+    # be rejected, and a failure halfway leaves no clue how far it got.
+    for start in range(0, len(points), UPLOAD_BATCH_SIZE):
+        batch = points[start : start + UPLOAD_BATCH_SIZE]
+        store.upsert(client, batch)
+        console.print(f"      upserted {min(start + len(batch), len(points))}/{len(points)} points")
     console.print(f"      [green]collection now holds {store.count(client)} points[/green]\n")
 
     console.rule("[bold green]Done")

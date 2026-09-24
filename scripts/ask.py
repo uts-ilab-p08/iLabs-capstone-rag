@@ -9,6 +9,7 @@ import argparse
 
 from rich.console import Console
 
+from rag import llm
 from rag.pipeline import answer_query
 
 console = Console()
@@ -25,10 +26,16 @@ def main() -> None:
     console.rule(f"[bold]Question: {query}")
     console.print("[bold]1/2[/bold] Embedding the question and searching Qdrant...")
     console.print("      [dim](first question loads the model, a few seconds)[/dim]")
+    console.print(f"      LLM: {llm.describe()}")
 
     # OUTPUT — in the backend, this dict is what gets handed to the response API.
     response = answer_query(query)
 
+    f = response["filters"]
+    applied = ", ".join(f["scenes"] + f["cameras"]) or "none"
+    console.print(f"      filter applied: {applied}")
+    for note in f["notes"]:
+        console.print(f"      [yellow]note:[/yellow] {note}")
     console.print(f"[bold]2/2[/bold] Answer built from {len(response['sources'])} matching event(s)\n")
     console.rule("[bold]response")
     console.print_json(data=response)
