@@ -430,6 +430,27 @@ wheels = [
 ]
 
 [[package]]
+name = "ilabs-cctv-rag"
+version = "0.1.1"
+source = { editable = "." }
+dependencies = [
+    { name = "fastembed" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "python-dotenv" },
+    { name = "qdrant-client" },
+    { name = "rich" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastembed", specifier = ">=0.8.0" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" },
+    { name = "python-dotenv", specifier = ">=1.2.3" },
+    { name = "qdrant-client", specifier = ">=1.19.0" },
+    { name = "rich", specifier = ">=15.0.0" },
+]
+
+[[package]]
 name = "loguru"
 version = "0.7.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1267,27 +1288,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3a/33/c6e4ec45b4fca5a0b808e8804e60be54a6d7505b68b53c0b1d0d62ba86c1/qdrant_client-1.19.0.tar.gz", hash = "sha256:365395a04b0a26c309b25b7d8b1c99ef2071ec9a2b74bc8a5fd3b7a3642fe963", size = 350953, upload-time = "2026-08-04T14:32:56.923Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fc/3c/480c61cc8d5a3e76bb44e86231f408c93643e5498beadbbeb381ab55d02b/qdrant_client-1.19.0-py3-none-any.whl", hash = "sha256:13602a2b3478a95ecdf42f97b93d7f703b63a3361cd912a04495a33a5ac14121", size = 396157, upload-time = "2026-08-04T14:32:55.734Z" },
-]
-
-[[package]]
-name = "rag"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "fastembed" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "python-dotenv" },
-    { name = "qdrant-client" },
-    { name = "rich" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastembed", specifier = ">=0.8.0" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" },
-    { name = "python-dotenv", specifier = ">=1.2.3" },
-    { name = "qdrant-client", specifier = ">=1.19.0" },
-    { name = "rich", specifier = ">=15.0.0" },
 ]
 
 [[package]]
