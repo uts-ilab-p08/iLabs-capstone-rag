@@ -9,15 +9,20 @@ Design notes and schema map: [`docs/rag-design.md`](docs/rag-design.md).
 
 ```bash
 uv sync
-cp .env.example .env     # fill in DATABASE_URL
+cp .env.example .env
 ```
 
-Qdrant runs one of two ways, decided by `QDRANT_URL` in `.env`:
+`DATABASE_URL` is needed only for indexing. Answering questions uses Qdrant and
+the LLM alone, so a query-only deployment needs no database credentials.
 
-- **empty** — runs embedded against `./qdrant_data`. No Docker needed.
-- **`http://localhost:6333`** — connects to the container in `docker-compose.yml`
-  (`docker compose up -d qdrant`). Adds the dashboard at
-  <http://localhost:6333/dashboard> and lets several processes share one index.
+Qdrant is chosen by `QDRANT_URL` in `.env`:
+
+- **a hosted cluster URL** — what the project uses, so the backend and your
+  laptop share one index. The API key goes in `QDRANT_API_KEY`.
+- **`http://localhost:6333`** — the container in `docker-compose.yml`
+  (`docker compose up -d qdrant`), with a dashboard at `/dashboard`.
+- **empty** — runs embedded against `./qdrant_data`, no Docker. Single process
+  only, and payload indexes are ignored, so filtering falls back to scanning.
 
 ## Use
 
@@ -46,55 +51,79 @@ response = answer_query(query)   # OUTPUT: dict to hand to the response API
 
 ```json
 {
-  "query": "did anyone get out of a vehicle?",
-  "answer": "Yes, a person got out of a vehicle in events [1], [2] and [3]...",
+  "query": "anything at the hospital on March 5 between 1pm and 2pm?",
+  "answer": "A white SUV left the parking area at 13:16 [1]...",
   "sources": [
     {
       "score": 0.649,
       "annotation": "A person in a dark jacket is seen exiting a white SUV...",
       "video_id": "20c38d5f...",
-      "event_id": "b159b039...",
-
-      "event_name": "Person exits a white SUV",
-      "video_name": "2018-03-05.13-20-00.13-25-00.school.G336",
-      "camera_id": "G336",
-      "scene": "school",
-      "start_seconds": 41.844,
-      "end_seconds": 52.306,
-      "object_types": ["car", "person"],
-      "video_url": "https://..."
+      "event_id": "b159b039..."
     }
   ],
-  "filters": {"scenes": ["hospital"], "cameras": [], "notes": []}
+  "filters": {
+    "scenes": ["hospital"],
+    "cameras": [],
+    "dates": ["2018-03-05"],
+    "time_of_day": [46800, 50400],
+    "notes": []
+  }
 }
 ```
 
-- `sources` holds at most 5 events, best first. The first four fields are the
-  agreed contract; the rest are included because the frontend needs them to play
-  the exact moment without querying Postgres again. Drop them if unwanted.
+- `sources` is the best `TOP_K` events, best first. Anything beyond these four
+  fields is looked up in Postgres by `event_id` — location, camera and
+  timestamps exist internally, because the prompt is built from them, but are
+  trimmed here.
 - `annotation` is the caption — bronze's `events.description`.
 - `answer` cites the events it used as `[1]`, `[2]`, matching `sources` order.
+  Citations are not guaranteed: weaker models sometimes omit them, so the
+  frontend must not depend on their presence.
 - No match → `"sources": []` and an answer saying no footage was found.
 - If the LLM is unreachable, `answer` degrades to a plain summary rather than
   raising, so the endpoint never fails because of the model.
-- `filters` is diagnostic: which metadata filter was applied and anything
-  deliberately ignored. Safe to drop from the API response, but useful for
-  telling the user "searched hospital only".
+- `filters` is diagnostic: what was filtered on, with `time_of_day` as seconds
+  since midnight, plus notes on anything deliberately ignored. Safe to drop, but
+  useful for telling the user "searched hospital only".
 
 ## Metadata filtering
 
-A question naming a location or camera is filtered before ranking, so
-"what happened in the hospital clip" searches only hospital footage.
+A question naming a location, camera, date or time of day is filtered before
+ranking. Several combine: *"anything at the hospital on March 5 between 1pm and
+2pm"* applies all three at once.
 
-Rule-based against the vocabulary actually present in the index (read from
-Qdrant, not Postgres — it must describe what is *searchable*). Handles
-synonyms (`campus`, `clinic`, `depot`) and rejects camera IDs that do not exist.
+| Names | Filters on | Understands |
+|---|---|---|
+| a location | `scene` | `school`, plus synonyms `campus`, `clinic`, `depot` |
+| a camera | `camera_id` | `G341`, several at once |
+| a date | `capture_date` | `2018-03-07`, `March 7`, `7 March`, `the 7th` |
+| a time | `start_time_of_day` | `2-4pm`, `between 13:00 and 14:00`, `after 2pm`, `before 11am`, `at 2pm` |
+
+All rule-based — no model call, so it adds no latency and is deterministic.
+
+The vocabulary of locations, cameras and dates is read from Qdrant rather than
+Postgres, because it must describe what is *searchable*: a location that exists
+upstream but is not yet indexed would otherwise become a filter matching
+nothing. It is read fresh on every query, so re-indexing makes a new location
+filterable immediately, with no restart.
+
+Time of day has its own field rather than reusing a timestamp range, because
+"2-4pm" across two days is two disjoint windows. `start_seconds` is an offset
+inside a clip and cannot answer "what happened at 2pm".
 
 Every rule errs toward filtering on nothing, because a wrong filter reports
 "no matching footage" about footage that exists, while a missed filter merely
-leaves results slightly noisy. So an ambiguous question ("was there a school
-bus?") and a negated one ("anything except the school") both fall back to
-unfiltered search, and say so in `filters.notes`.
+leaves results slightly noisy. So these all fall back to unfiltered search and
+say why in `filters.notes`:
+
+- **ambiguous location** — "was there a school bus?" matches two locations
+- **negation** — "anything except the school"
+- **ambiguous time** — "2-4" could be 02:00 or 14:00; only an explicit `am`/`pm`
+  or an hour of 13+ is unambiguous
+- **ambiguous date** — "the 7th" when several indexed dates fall on a 7th
+
+A fully written date that *isn't* in the index still filters, giving no results —
+"nothing was recorded that day" is the honest answer.
 
 **When a filter matches, the similarity floor is dropped.** The filter is then
 the relevance signal. This is what makes scope questions work: no single event
@@ -154,8 +183,8 @@ tagged commit is exactly what gets installed**.
      /tmp/rag-check/bin/python -c "from rag.pipeline import answer_query; print('RAG package OK')"
    ```
 
-   (`DATABASE_URL` only needs to be set, not valid — `rag.config` reads it at
-   import time.)
+   (`DATABASE_URL` is no longer needed for this check — it is optional, and only
+   indexing reads Postgres. Setting it does no harm.)
 
 3. **Commit and push first, then tag.** A tag points at a commit, not at your
    working tree: tagging before committing publishes the *previous* commit.
@@ -196,7 +225,10 @@ src/rag/
   db.py       fetch events from Supabase bronze schema
   text.py     compose the string that gets embedded
   embed.py    bge-base-en-v1.5 via fastembed (ONNX, no PyTorch)
-  store.py    Qdrant collection, upsert, search
+  store.py    Qdrant collection, payload schema, upsert, search
+  filters.py  pull location and camera filters out of a question
+  temporal.py pull dates and clock ranges out of a question
+  llm.py      one client for OpenRouter and Ollama
   pipeline.py answer_query(query) -> response   <- what the backend calls
 scripts/
   index_events.py    fetch -> compose -> embed -> store
@@ -208,6 +240,7 @@ scripts/
 
 ## Not built yet
 
-LLM query parsing into metadata filters, answer generation, temporal-ordering
-queries, hybrid search, the embedding-model benchmark, and the retrieval
-evaluation harness. See `docs/rag-design.md`.
+Temporal-ordering queries ("what happened after the van arrived"), hybrid
+keyword-plus-vector search, LLM-based filter extraction, whole-clip
+chronological summarisation, the embedding-model benchmark, the retrieval
+evaluation harness, and automated tests. See `docs/rag-design.md`.

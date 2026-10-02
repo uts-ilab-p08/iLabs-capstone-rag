@@ -93,14 +93,17 @@ by this component.
 ### 3.2 Characteristics that shaped the design
 
 These are properties of the real data, each of which forced a design decision.
+Figures are a snapshot (October 2026) of a corpus that is still growing: 2,013
+indexed events, 23 cameras, four locations (school 980, bus 675, hospital 309,
+admin 49) across two dates.
 
 **Several cameras watch each location, synchronised to GPS time.** MEVA's ground
-cameras have overlapping fields of view. In the current index, **113 pairs of
-events share a location and an overlapping wall-clock time while coming from
-different cameras** — the same occurrence filmed from two angles. Any rule of the
-form "different camera means different object" is therefore wrong, and wrong on
-the majority of the data. This is why the prompt reasons about location and clock
-time instead (§7).
+cameras have overlapping fields of view. In the current index, **5,893 pairs of
+events share a date, a location and an overlapping wall-clock time while coming
+from different cameras** — the same occurrence filmed from two angles. Any rule
+of the form "different camera means different object" is therefore wrong, and
+wrong at scale. This is why the prompt reasons about location and clock time
+instead (§7).
 
 **Clock time is only recoverable from the clip filename.** Events store an offset
 within their clip. Clips are named `2018-03-05.13-20-00.13-25-00.school.G424`, so
@@ -134,8 +137,27 @@ id       = uuid5(NAMESPACE_URL, event_id)
 vector   = 768 floats, cosine distance
 payload  = event_id, video_id, video_name, camera_id, scene,
            event_name, description, start_seconds, end_seconds,
-           object_types, source_status, video_url, composed_text
+           object_types, source_status, video_url, composed_text,
+           capture_date, start_time_of_day, start_timestamp
 ```
+
+The last three carry when the event happened, in the forms Qdrant can filter on.
+`start_seconds` is an offset inside its clip and cannot answer "what happened at
+2pm", so absolute time is stored separately:
+
+| Field | Form | Answers |
+|---|---|---|
+| `capture_date` | `"2018-03-07"` | which day; also the date vocabulary, via facet |
+| `start_time_of_day` | seconds since midnight | time of day, across all days |
+| `start_timestamp` | epoch seconds | an absolute point in time |
+
+Time of day needs its own field because it cannot be expressed as a range over
+timestamps: 2-4pm across two days is two disjoint windows.
+
+Epoch values are pinned to UTC rather than the machine's local timezone, so an
+index built on one machine and queried from another agree. The source
+timestamps carry no timezone at all, so this is a consistent convention rather
+than a claim about real local time.
 
 **Point IDs are derived from `event_id` by a pure function.** The same event
 always produces the same point ID, so re-indexing overwrites rather than
@@ -206,6 +228,16 @@ Matching is rule-based against that vocabulary, plus a small synonym map
 exact tokens and discarded if unknown, so a typo cannot become a filter that
 guarantees zero results.
 
+Dates and clock ranges are parsed the same way (`temporal.py`): `2018-03-07`,
+`March 7`, `the 7th`, `2-4pm`, `between 13:00 and 14:00`, `after 2pm`. Partial
+dates resolve against the dates actually indexed, in the same spirit as
+rejecting an unknown camera. Several filters combine with AND, so "the hospital
+on March 5 between 1pm and 2pm" narrows on all three.
+
+One parsing detail worth knowing: dates are stripped from the text before clock
+ranges are read, because `2018-03-07` contains `03-07` and reads as the range
+"3 to 7". Without that, every dated question reported an ambiguous time.
+
 **Every rule errs toward filtering on nothing**, because the two failure modes
 are not symmetric. A missed filter leaves results slightly noisy. A wrong filter
 reports "no matching footage" about footage that exists, and nothing downstream
@@ -215,7 +247,13 @@ can recover it. So:
   applies no location filter.
 - A negated one ("anything except the school") applies no filter rather than
   guessing at the inverse.
-- Both record why in `filters.notes`.
+- An ambiguous time ("2-4", which could be 02:00 or 14:00) applies no time
+  filter. The corpus runs 11:00–17:00, so guessing "pm" would usually be right
+  and silently wrong the rest of the time. An explicit am/pm, or an hour of 13
+  or more, is unambiguous.
+- A fully written date that is not in the index *does* filter, returning
+  nothing, because "no footage was recorded that day" is the honest answer.
+- All of these record why in `filters.notes`.
 
 Object type is deliberately not filtered on, because the labels disagree with
 themselves (§3.2).
