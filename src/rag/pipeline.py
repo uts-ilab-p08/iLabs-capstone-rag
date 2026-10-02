@@ -22,7 +22,7 @@ from rag.embed import Embedder
 
 log = logging.getLogger(__name__)
 
-TOP_K = 5
+TOP_K = 15
 
 # Hits below this cosine similarity are treated as unrelated and dropped.
 # Chosen from early testing: real matches scored ~0.72–0.82, a nonsense query
@@ -55,7 +55,7 @@ def _mmss(seconds: float | None) -> str:
 def retrieve(query: str, limit: int = TOP_K) -> tuple[list[dict], filters.FilterSpec]:
     """Embed the question and return (matching events best first, filter used)."""
     client = _client()
-    spec = filters.extract(query, *filters.vocabulary(client))
+    spec = filters.extract(query, filters.vocabulary(client))
     query_filter = filters.to_qdrant_filter(spec)
 
     vector = _embedder().embed_query(query)
@@ -311,6 +311,7 @@ def answer_query(query: str) -> dict:
                 "annotation": s["annotation"],
                 "video_id": s["video_id"],
                 "event_id": s["event_id"],
+                
             }
             for s in sources
         ],

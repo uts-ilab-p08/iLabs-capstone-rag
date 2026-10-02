@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from functools import lru_cache
 
 from qdrant_client import QdrantClient, models
 
+from rag import temporal
 from rag.config import COLLECTION
 
 # Everyday words for the locations MEVA labels more tersely.
@@ -39,17 +39,23 @@ NEGATIONS = ("not", "no", "except", "excluding", "other than", "besides", "witho
 _CAMERA_RE = re.compile(r"\b[gG]\d{3}\b")
 
 
+def _hhmm(seconds: int) -> str:
+    return f"{seconds // 3600:02d}:{seconds % 3600 // 60:02d}"
+
+
 @dataclass(frozen=True)
 class FilterSpec:
     """What we decided to filter on, and why."""
 
     scenes: tuple[str, ...] = ()
     cameras: tuple[str, ...] = ()
+    dates: tuple[str, ...] = ()
+    time_of_day: tuple[int, int] | None = None
     notes: tuple[str, ...] = field(default=())
 
     @property
     def is_empty(self) -> bool:
-        return not self.scenes and not self.cameras
+        return not (self.scenes or self.cameras or self.dates or self.time_of_day)
 
     def describe(self) -> str:
         parts = []
@@ -57,6 +63,10 @@ class FilterSpec:
             parts.append("location " + " or ".join(self.scenes))
         if self.cameras:
             parts.append("camera " + " or ".join(self.cameras))
+        if self.dates:
+            parts.append("date " + " or ".join(self.dates))
+        if self.time_of_day:
+            parts.append(f"time {_hhmm(self.time_of_day[0])}-{_hhmm(self.time_of_day[1])}")
         if not parts:
             parts.append("none")
         if self.notes:
@@ -67,13 +77,21 @@ class FilterSpec:
         return {
             "scenes": list(self.scenes),
             "cameras": list(self.cameras),
+            "dates": list(self.dates),
+            "time_of_day": list(self.time_of_day) if self.time_of_day else None,
             "notes": list(self.notes),
         }
 
 
-@lru_cache(maxsize=1)
-def vocabulary(client: QdrantClient) -> tuple[frozenset[str], frozenset[str]]:
-    """Distinct scenes and camera IDs that are actually in the index.
+@dataclass(frozen=True)
+class Vocabulary:
+    scenes: frozenset[str] = frozenset()
+    cameras: frozenset[str] = frozenset()
+    dates: frozenset[str] = frozenset()
+
+
+def vocabulary(client: QdrantClient) -> Vocabulary:
+    """Distinct scenes, camera IDs and dates that are actually in the index.
 
     Read from Qdrant rather than Postgres on purpose: the vocabulary has to
     describe what is *searchable*. A location that exists upstream but has not
@@ -83,34 +101,42 @@ def vocabulary(client: QdrantClient) -> tuple[frozenset[str], frozenset[str]]:
     payload indexes. Falls back to a scroll for embedded mode, where payload
     indexes are not created.
 
-    Cached for the life of the process, so a long-running server will not notice
-    newly indexed locations until it restarts.
+    Deliberately not cached. It costs about 75ms against a hosted cluster, which
+    is roughly a hundredth of the LLM call that follows, and reading it fresh
+    means a newly indexed location becomes filterable immediately rather than
+    after the next restart. The stale-cache version failed quietly — queries
+    kept working but silently stopped narrowing — which is the worst kind of
+    bug to leave in a service someone else operates.
     """
-    scenes, cameras = set(), set()
+    fields = ("scene", "camera_id", "capture_date")
+    sinks: dict[str, set[str]] = {name: set() for name in fields}
     try:
-        for key, sink in (("scene", scenes), ("camera_id", cameras)):
-            for hit in client.facet(collection_name=COLLECTION, key=key, limit=200).hits:
+        for key in fields:
+            for hit in client.facet(collection_name=COLLECTION, key=key, limit=500).hits:
                 if hit.value:
-                    sink.add(str(hit.value))
+                    sinks[key].add(str(hit.value))
     except Exception:  # noqa: BLE001 - embedded mode, or no payload index
-        scenes, cameras = set(), set()
+        sinks = {name: set() for name in fields}
         offset = None
         while True:
             points, offset = client.scroll(
                 collection_name=COLLECTION,
                 limit=500,
                 offset=offset,
-                with_payload=["scene", "camera_id"],
+                with_payload=list(fields),
                 with_vectors=False,
             )
             for p in points:
-                if p.payload.get("scene"):
-                    scenes.add(str(p.payload["scene"]))
-                if p.payload.get("camera_id"):
-                    cameras.add(str(p.payload["camera_id"]))
+                for key in fields:
+                    if p.payload.get(key):
+                        sinks[key].add(str(p.payload[key]))
             if offset is None:
                 break
-    return frozenset(scenes), frozenset(cameras)
+    return Vocabulary(
+        scenes=frozenset(sinks["scene"]),
+        cameras=frozenset(sinks["camera_id"]),
+        dates=frozenset(sinks["capture_date"]),
+    )
 
 
 def _negated(text: str, start: int) -> bool:
@@ -119,9 +145,24 @@ def _negated(text: str, start: int) -> bool:
     return any(neg in window for neg in NEGATIONS)
 
 
-def extract(query: str, known_scenes: frozenset[str], known_cameras: frozenset[str]) -> FilterSpec:
+def extract(query: str, vocab: Vocabulary) -> FilterSpec:
     text = (query or "").lower()
+    known_scenes, known_cameras = vocab.scenes, vocab.cameras
     notes: list[str] = []
+
+    # Dates and times of day. Both refuse rather than guess, and both report
+    # why, so an unfiltered answer is never silently unexplained.
+    found_dates: tuple[str, ...] = ()
+    time_of_day: tuple[int, int] | None = None
+    try:
+        found_dates = temporal.dates(text, vocab.dates)
+    except temporal.Ambiguous as exc:
+        notes.append(f"ignored date: {exc}")
+    try:
+        # Dates first: their digits would otherwise be read as a clock range.
+        time_of_day = temporal.time_of_day_range(temporal.strip_dates(text))
+    except temporal.Ambiguous as exc:
+        notes.append(f"ignored time: {exc}")
 
     # Cameras: exact tokens like G341. Unknown IDs are discarded rather than
     # turned into a filter that is guaranteed to match nothing.
@@ -159,11 +200,21 @@ def extract(query: str, known_scenes: frozenset[str], known_cameras: frozenset[s
         notes.append("ambiguous location (" + ", ".join(sorted(scenes)) + "), not filtering")
         scenes = set()
 
-    return FilterSpec(tuple(sorted(scenes)), tuple(sorted(cameras)), tuple(notes))
+    return FilterSpec(
+        scenes=tuple(sorted(scenes)),
+        cameras=tuple(sorted(cameras)),
+        dates=found_dates,
+        time_of_day=time_of_day,
+        notes=tuple(notes),
+    )
 
 
 def to_qdrant_filter(spec: FilterSpec) -> models.Filter | None:
-    """FilterSpec -> Qdrant filter. Values within a field are OR, fields are AND."""
+    """FilterSpec -> Qdrant filter. Values within a field are OR, fields are AND.
+
+    So "the school between 2 and 4pm" becomes scene=school AND a time-of-day
+    range, which is what lets several filters narrow together.
+    """
     if spec.is_empty:
         return None
     must = []
@@ -172,5 +223,16 @@ def to_qdrant_filter(spec: FilterSpec) -> models.Filter | None:
     if spec.cameras:
         must.append(
             models.FieldCondition(key="camera_id", match=models.MatchAny(any=list(spec.cameras)))
+        )
+    if spec.dates:
+        must.append(
+            models.FieldCondition(key="capture_date", match=models.MatchAny(any=list(spec.dates)))
+        )
+    if spec.time_of_day:
+        start, end = spec.time_of_day
+        must.append(
+            models.FieldCondition(
+                key="start_time_of_day", range=models.Range(gte=start, lte=end)
+            )
         )
     return models.Filter(must=must)
