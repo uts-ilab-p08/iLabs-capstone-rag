@@ -9,8 +9,8 @@ tables and charts these findings come from.
 
 Metadata filtering is the single largest factor in retrieval accuracy. With it
 enabled the system found the correct footage for **20 of 22** answerable
-questions; without it, **9 of 22**. Mean reciprocal rank more than doubled, from
-0.409 to 0.909.
+questions; without it, **10 of 22**. Mean reciprocal rank roughly doubled, from
+0.432 to 0.886.
 
 The system also declines to answer when it should: **4 of 5** questions about
 things absent from the footage returned nothing, and **3 of 3** ambiguous or
@@ -35,7 +35,7 @@ model may have fumbled footage it was given.
 
 Each question carries criteria describing what a correct answer looks like —
 caption terms plus optional location, camera, date and time constraints. The
-answer key is built by scanning the caption text of all 2,013 indexed events.
+answer key is built by scanning the caption text of every indexed event.
 
 **The system under test never sees those criteria.** It receives only the
 question. Building the answer key from the system's own search results would
@@ -46,11 +46,16 @@ has to bridge a vocabulary gap the answer key does not, which makes these
 scores a **lower bound** — a correct result whose caption wording differs from
 the key is counted as a miss. Understating is the safer direction to err.
 
+Because the criteria are evaluated against the live index rather than naming
+fixed videos, the question set survives the corpus changing. That has been
+exercised: the annotations were regenerated partway through the project, and the
+set was re-validated rather than rewritten.
+
 ### Setup
 
 | | |
 |---|---|
-| Events indexed | 2,013 |
+| Events indexed | 1,954 |
 | Videos | 71 |
 | Locations | 4 (school, bus, hospital, admin) |
 | Cameras | 23 |
@@ -60,7 +65,8 @@ the key is counted as a miss. Understating is the safer direction to err.
 
 **30 questions**: 22 answerable (plain lookup, location, camera, date, time and
 combined filters), 5 negative, 3 refusal. Difficulty is uneven on purpose — one
-question has 7 relevant events in the entire corpus, another has 1,621.
+question has a single relevant event in the entire corpus, another has over
+1,500.
 
 ---
 
@@ -68,13 +74,13 @@ question has 7 relevant events in the entire corpus, another has 1,621.
 
 | Condition | Hit@1 | Hit@3 | Hit@5 | out of | MRR | returned nothing |
 |---|---|---|---|---|---|---|
-| **Filters on** | 20 | 20 | 20 | 22 | **0.909** | 2 |
-| **Filters off** | 9 | 9 | 9 | 22 | 0.409 | 12 |
+| **Filters on** | 19 | 20 | 20 | 22 | **0.886** | 2 |
+| **Filters off** | 9 | 10 | 10 | 22 | 0.432 | 12 |
 
-### Finding 1 — filtering more than doubles accuracy
+### Finding 1 — filtering doubles accuracy
 
-20 of 22 against 9 of 22. At this sample size a difference of one or two
-questions would mean nothing; a difference of eleven is real.
+20 of 22 against 10 of 22. At this sample size a difference of one or two
+questions would mean nothing; a difference of ten is real.
 
 **The mechanism is visible in the last column.** With filters off, 12 of 22
 questions returned *nothing at all* — not wrong footage, no footage. The
@@ -83,39 +89,41 @@ similarity floor of 0.6 rejected every result.
 This is the behaviour the design anticipated. Similarity measures textual
 resemblance, not relevance, and a question like "what happened at the hospital?"
 resembles no individual caption, because no caption is phrased as a summary of a
-clip. Every hospital event scores around 0.45–0.50 while being perfectly
+clip. Every hospital event scores well below the floor while being perfectly
 relevant. When a filter matches, the floor is dropped and the filter supplies
-relevance instead — which is exactly why those 11 questions recover.
+relevance instead — which is why those questions recover.
 
 Every location, camera, date and combined question failed without filtering and
 succeeded with it.
 
-### Finding 2 — when it finds the footage, it finds it first
+### Finding 2 — when it finds the footage, it almost always finds it first
 
-Hit@1, Hit@3 and Hit@5 are identical in both conditions. The system never
-recovers at ranks 2 through 5: either the correct video is the top result, or it
-is not in the list at all.
+Of the 20 questions answered correctly, **19 had the correct video as the top
+result**. Only one recovered lower down: *"What did camera G341 record between
+11am and noon?"* was found at rank 2.
 
-Useful practically — a user does not need to scan five results — and it means
-`TOP_K` could be reduced without losing accuracy, at some cost to the context
-the language model receives.
+So the practical shape is near-binary — either the right footage is first, or it
+is not in the list. A user rarely needs to scan past the first result, and
+`TOP_K` could be reduced without losing much accuracy, at some cost to the
+context the language model receives.
 
 ### Finding 3 — negative questions: 4 of 5
 
-Questions about an ambulance, a helicopter, a dog, an umbrella and children.
-None of these words appears in any caption, verified directly against the
-corpus. A system that always returns something would score well on recall-style
-measures while being useless in practice, so this is measured explicitly.
+Questions about an ambulance, a helicopter, a wheelchair, an umbrella and a
+stroller. None of these words appears in any caption, verified directly against
+the corpus. A system that always returns something would score well on
+recall-style measures while being useless in practice, so this is measured
+explicitly.
 
 Four returned nothing, correctly. **One failed, and the failure is instructive.**
 
-"Did an ambulance arrive at the hospital?" returned five hospital events at
-scores around 0.59. The word *hospital* triggered the location filter, the floor
-was dropped as designed, and hospital footage came back — for a question about
-an ambulance that does not exist.
+"Did an ambulance arrive at the hospital?" returned five hospital events. The
+word *hospital* triggered the location filter, the floor was dropped as designed,
+and hospital footage came back — for a question about an ambulance that does not
+exist.
 
 This is the cost of Finding 1, not a separate bug. Dropping the floor is what
-rescues eleven questions; it is also what lets this one through. The two are the
+rescues ten questions; it is also what lets this one through. The two are the
 same mechanism.
 
 ### Finding 4 — refusals: 3 of 3
@@ -139,7 +147,7 @@ downstream can recover it; a missed filter merely leaves results broad.
 
 ### q03 — "Did anyone use a phone?"
 
-Returned nothing, in both conditions, despite 121 relevant events.
+Returned nothing, in both conditions, despite 124 relevant events.
 
 The question names no location, so no filter fires, so the 0.6 floor applies —
 and every result fell below it. The cause is **question phrasing**. The same
@@ -147,12 +155,14 @@ content scores very differently depending on wording:
 
 | Query | Top score | Survives the floor? |
 |---|---|---|
-| "bicycle" | 0.689 | yes |
-| "a person riding a bicycle" | 0.691 | yes |
-| "Did anyone ride a bicycle?" | 0.571 | no |
+| "phone" | 0.638 | yes |
+| "Did anyone use a phone?" | 0.575 | no |
+| "bicycle" | 0.708 | yes |
+| "a person riding a bicycle" | 0.673 | yes |
+| "Did anyone ride a bicycle?" | 0.563 | no |
 
-Interrogative phrasing costs roughly 0.12 of similarity, because captions are
-declarative descriptions and nothing in the corpus is phrased as a question.
+Interrogative phrasing costs roughly 0.07–0.15 of similarity, because captions
+are declarative descriptions and nothing in the corpus is phrased as a question.
 Conversational questions — exactly what the system invites — are penalised
 relative to keyword-style ones.
 
@@ -163,12 +173,13 @@ and the floor rejected everything.
 
 The clock parser handles only numeric readings. **"noon", "midday" and
 "midnight" are not recognised**, and they fail *silently* — the parser returns
-nothing rather than refusing, so no note appears in the output explaining why
-the filter did not fire. "between 11am and 12pm" works correctly.
+nothing rather than refusing, so no note appears in the output explaining why the
+filter did not fire. "between 11am and 12pm" works correctly.
 
 The same gap affects q22 ("what did camera G341 record between 11am and noon?"),
 where the time filter was also dropped. That question still succeeded, because
-the camera filter carried it.
+the camera filter carried it — though it was the one result found at rank 2
+rather than rank 1.
 
 ---
 
@@ -185,7 +196,7 @@ matches" from the gap between consecutive scores rather than an absolute cut-off
 the worst option; even a note saying the time was not understood would make this
 visible to a user.
 
-**`TOP_K` could be lowered.** Nothing was ever found below rank 1.
+**`TOP_K` could be lowered.** Only one correct result was ever found below rank 1.
 
 ---
 
@@ -211,6 +222,12 @@ relevant one. Finer scoring would need event-level ground truth.
 what the corpus actually contains, which avoids asking about things the system
 could never find — but it is not an independent, blind question set.
 
+**The corpus is a moving target.** These figures describe a particular index.
+When the annotations were last regenerated, two negative questions silently
+became invalid because new captions introduced a dog and a child; both were
+replaced after re-validation. Any re-run should re-validate the question set
+first, since a broken negative fails quietly rather than loudly.
+
 ---
 
 ## Reproducing
@@ -220,8 +237,7 @@ cd rag/eval
 uv run jupyter lab evaluation.ipynb      # or: uv run jupyter nbconvert --execute --inplace --to notebook evaluation.ipynb
 ```
 
-No language model is called, so the run is deterministic and free. The
-notebook records the corpus size, embedding model, `TOP_K` and `MIN_SCORE` of
-the run that produced it — results from different settings are not comparable.
-The corpus has grown several times during the project, so re-running on a larger
-index will not reproduce these exact numbers.
+No language model is called, so the run is deterministic and free. The notebook
+records the corpus size, embedding model, `TOP_K` and `MIN_SCORE` of the run that
+produced it — results from different settings are not comparable, and the corpus
+has changed several times during the project.

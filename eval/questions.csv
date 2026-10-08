@@ -1,5 +1,5 @@
 id,category,question,match_any,scene,camera,date,time_from,time_to,expect_nothing,expect_note,notes
-q01,lookup,Did anyone get out of a vehicle?,"exits? (a|the) (white |dark |red |blue )?(suv|sedan|car|vehicle|truck)|gets out of|steps out of",,,,,,FALSE,,Deliberately hard: only 7 events describe this and the phrasing differs from the captions
+q01,lookup,Did anyone get out of a vehicle?,exits? (a|the) (white |dark |red |blue )?(suv|sedan|car|vehicle|truck)|gets out of|steps out of,,,,,,FALSE,,Deliberately hard: a handful of events describe this and the phrasing differs from the captions
 q02,lookup,Is anyone carrying a backpack?,backpack,,,,,,FALSE,,Common object across all four locations
 q03,lookup,Did anyone use a phone?,\bphone\b,,,,,,FALSE,,Tests an action rather than an object
 q04,lookup,Was there a white SUV?,white suv,,,,,,FALSE,,Colour plus vehicle type; very common
@@ -7,7 +7,7 @@ q05,lookup,Is there a bicycle anywhere in the footage?,\bbicycle\b|\bbike\b,,,,,
 q06,lookup,Were there groups of people?,group of (people|individuals|persons),,,,,,FALSE,,"Plural subject. Scoped to groups of people, since 'group of' alone also matches traffic cones"
 q07,lookup,Did anyone walk up or down stairs?,\bstairs\b|\bstaircase\b,,,,,,FALSE,,Indoor movement
 q08,location,What happened at the hospital?,,hospital,,,,,FALSE,,Scope question; no single caption resembles a summary request
-q09,location,Was there a motorcycle at the hospital?,\bmotorcycle\b,hospital,,,,,FALSE,,Only 9 events and all in one video; precise target
+q09,location,Was there a motorcycle at the hospital?,\bmotorcycle\b,hospital,,,,,FALSE,,Very precise target - only a single event in the corpus mentions a motorcycle
 q10,location,Did anyone take the stairs in the admin building?,\bstairs\b|\bstaircase\b,admin,,,,,FALSE,,Smallest location in the corpus
 q11,location,Were people sitting on benches at the bus station?,(seated|sitting|sits) on (a|the) bench,bus,,,,,FALSE,,"Tests the bus-station wording. Requires sitting on a bench, since 'bench' alone matches scenery someone merely walks past"
 q12,location,Was anyone carrying a suitcase at the hospital?,\bsuitcase\b|\bluggage\b,hospital,,,,,FALSE,,Object plus location
@@ -19,13 +19,13 @@ q17,time,What happened between 11am and noon?,,,,,11:00,12:00,FALSE,,Busiest hou
 q18,time,Was anything recorded after 4pm?,,,,,16:00,23:59,FALSE,,Open-ended range
 q19,time,What happened between 1pm and 2pm?,,,,,13:00,14:00,FALSE,,24-hour clock form
 q20,combined,What happened at the school between 2 and 3pm?,,school,,,14:00,15:00,FALSE,,Location and time together
-q21,combined,Anything at the hospital on 5 March?,,hospital,,2018-03-05,,,FALSE,,Location and date together; only 24 events qualify
+q21,combined,Anything at the hospital on 5 March?,,hospital,,2018-03-05,,,FALSE,,Location and date together; only a couple of dozen events qualify
 q22,combined,What did camera G341 record between 11am and noon?,,,G341,,11:00,12:00,FALSE,,Camera and time together
 q23,negative,Did an ambulance arrive at the hospital?,\bambulance\b,,,,,,TRUE,,Plausible for the setting but no caption mentions an ambulance
 q24,negative,Is there a helicopter anywhere in the footage?,\bhelicopter\b,,,,,,TRUE,,Clearly absent; tests that the system will say so
-q25,negative,Did anyone bring a dog?,\bdog\b|\bdogs\b,,,,,,TRUE,,Absent; a system that always returns something fails here
+q25,negative,Was anyone using a wheelchair?,\bwheelchair\b,,,,,,TRUE,,"Plausible given the hospital footage, but absent from every caption. Replaced an earlier dog question after regenerated annotations introduced a dog"
 q26,negative,Was anyone using an umbrella?,\bumbrella\b,,,,,,TRUE,,Absent
-q27,negative,Are there any children in the footage?,\bchild\b|\bchildren\b|\bkid\b|\btoddler\b,,,,,,TRUE,,Absent; all described subjects are adults
+q27,negative,Was anyone pushing a stroller?,\bstroller\b|\bpram\b|\bpushchair\b,,,,,,TRUE,,"Plausible in a public transit setting, but absent. Replaced an earlier children question after regenerated annotations introduced children"
 q28,refusal,Was there a school bus?,\bschool bus\b,,,,,,TRUE,ambiguous,Matches two location names; the extractor should refuse to filter and say why
 q29,refusal,What happened at 2-4?,,,,,,,FALSE,ignored time,No am/pm given; the time filter should be refused rather than guessed
 q30,refusal,Show me anything except at the school,,,,,,,FALSE,excluded,Negation; the location filter should be refused rather than inverted

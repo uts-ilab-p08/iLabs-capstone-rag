@@ -93,12 +93,12 @@ by this component.
 ### 3.2 Characteristics that shaped the design
 
 These are properties of the real data, each of which forced a design decision.
-Figures are a snapshot (October 2026) of a corpus that is still growing: 2,013
-indexed events, 23 cameras, four locations (school 980, bus 675, hospital 309,
-admin 49) across two dates.
+Figures are a snapshot (October 2026) of a corpus that is still changing: 1,954
+indexed events, 23 cameras, four locations (school 1,001, bus 656, hospital 250,
+admin 47) across two dates.
 
 **Several cameras watch each location, synchronised to GPS time.** MEVA's ground
-cameras have overlapping fields of view. In the current index, **5,893 pairs of
+cameras have overlapping fields of view. In the current index, **6,171 pairs of
 events share a date, a location and an overlapping wall-clock time while coming
 from different cameras** — the same occurrence filmed from two angles. Any rule
 of the form "different camera means different object" is therefore wrong, and
@@ -110,10 +110,12 @@ within their clip. Clips are named `2018-03-05.13-20-00.13-25-00.school.G424`, s
 the absolute time is the clip start plus the offset. Without that, two events at
 "0:41" in different clips are indistinguishable from simultaneous ones.
 
-**Events are duplicated.** Roughly 13% of event rows are exact duplicates —
-identical caption, identical timespan, same video, different `event_id`. Some
-share the same objects (one occurrence inserted more than once); others differ
-only in which object they name. Indexing collapses them (§4).
+**Events were duplicated, and are no longer.** An earlier generation of the
+annotations produced roughly 13% exact duplicates — identical caption, identical
+timespan, same video, different `event_id`. After the annotations were
+regenerated this fell to a single duplicate across the whole corpus. The
+de-duplication step in indexing (§4) is retained as a safeguard rather than a
+necessity, since the behaviour could return with another change upstream.
 
 **Object labels are unreliable.** `label_details` is a list of competing
 hypotheses: the same white SUV appears as `car` in one event and `truck` in
