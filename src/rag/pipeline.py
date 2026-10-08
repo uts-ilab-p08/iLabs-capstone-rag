@@ -22,7 +22,7 @@ from rag.embed import Embedder
 
 log = logging.getLogger(__name__)
 
-TOP_K = 15
+TOP_K = 5
 
 # Hits below this cosine similarity are treated as unrelated and dropped.
 # Chosen from early testing: real matches scored ~0.72–0.82, a nonsense query
@@ -52,10 +52,17 @@ def _mmss(seconds: float | None) -> str:
     return f"{int(seconds) // 60}:{int(seconds) % 60:02d}"
 
 
-def retrieve(query: str, limit: int = TOP_K) -> tuple[list[dict], filters.FilterSpec]:
-    """Embed the question and return (matching events best first, filter used)."""
+def retrieve(
+    query: str, limit: int = TOP_K, use_filters: bool = True
+) -> tuple[list[dict], filters.FilterSpec]:
+    """Embed the question and return (matching events best first, filter used).
+
+    `use_filters=False` skips metadata extraction entirely, leaving pure vector
+    search. Only the evaluation uses it, to measure how much filtering actually
+    contributes.
+    """
     client = _client()
-    spec = filters.extract(query, filters.vocabulary(client))
+    spec = filters.extract(query, filters.vocabulary(client)) if use_filters else filters.FilterSpec()
     query_filter = filters.to_qdrant_filter(spec)
 
     vector = _embedder().embed_query(query)

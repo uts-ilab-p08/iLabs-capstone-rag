@@ -1,0 +1,53 @@
+row,model,question_id,correctness,faithfulness,usefulness,comment
+1,google/gemma-4-26b-a4b-it:free,m12,3,3,3,builds a sequence across events without establishing they are the same vehicle
+2,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m11,4,5,3,"all five do show suitcases so citing all is justified, but says 'a person' when [1] has two, and gives no times"
+3,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m09,5,5,3,"covers everything but gives no times, for a time-scoped question"
+4,google/gemma-4-26b-a4b-it:free,m14,5,5,5,all five with times and detail
+5,nvidia/nemotron-3-ultra-550b-a55b:free,m04,5,5,5,"correct refusal plus the nearest near-miss, which preempts 'are you sure?'"
+6,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m02,2,5,2,answers from one event only; implies a single SUV when five separate sightings were supplied
+7,google/gemma-4-26b-a4b-it:free,m03,3,3,4,"asserts 5 distinct people; [4] and [5] are same camera, same description, one minute apart"
+8,nvidia/nemotron-3-ultra-550b-a55b:free,m06,5,5,5,"all five instances, grouped by location, with times"
+9,google/gemma-4-26b-a4b-it:free,m13,5,5,5,"complete, notes the green lining variation"
+10,nvidia/nemotron-3-ultra-550b-a55b:free,m08,5,5,5,identifies [2][4][5] as likely one arrival from different angles
+11,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m12,3,5,3,describes one event only; does not really address 'after'
+12,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m15,4,3,3,"right conclusion but asserts they are different individuals, which is not established either"
+13,google/gemma-4-26b-a4b-it:free,m15,1,2,1,WRONG - claims a cross-camera match then names G505 twice. Contradicts its own evidence
+14,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m01,4,5,4,accurate but omits event [5] from a 'what happened' summary
+15,nvidia/nemotron-3-ultra-550b-a55b:free,m09,5,5,5,"times, detail, correctly separates the two pairs of walkers"
+16,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m08,4,5,4,omits [5]
+17,google/gemma-4-31b-it:free,m03,3,3,4,same unhedged count as row 7
+18,google/gemma-4-26b-a4b-it:free,m06,5,5,5,all five with distinguishing detail
+19,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m06,3,5,3,only 2 of 5 instances
+20,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m03,3,2,2,"bare number, no citation, no evidence"
+21,nvidia/nemotron-3-ultra-550b-a55b:free,m03,4,4,5,"justifies the count rather than asserting it, though 'distinct clothing' is weak for [4]/[5]"
+22,nvidia/nemotron-3-ultra-550b-a55b:free,m01,5,5,4,complete; chronology jumps back and forth
+23,google/gemma-4-26b-a4b-it:free,m11,5,5,5,"times, notes two people in [1], flags [2] as a different day; 'right hand' verified in context"
+24,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m13,4,5,3,correct but does not flag that five different people are described
+25,nvidia/nemotron-3-ultra-550b-a55b:free,m10,5,5,5,"correct no, explains why [1] is not unattended, contrasts with the rest"
+26,google/gemma-4-26b-a4b-it:free,m05,5,5,5,"refuses and says what the footage does show, with citations"
+27,google/gemma-4-31b-it:free,m02,5,5,5,leads with closest match then separates the other sightings by location
+28,nvidia/nemotron-3-ultra-550b-a55b:free,m07,5,5,5,catches the van mislabelled as truck AND flags [2]/[4] as possibly one vehicle
+29,google/gemma-4-31b-it:free,m04,5,5,4,correct one-sentence refusal
+30,nvidia/nemotron-3-ultra-550b-a55b:free,m15,5,5,5,"precise reasoning: two locations, different days, and the only same-location pair is one camera"
+31,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m14,5,5,3,correct but no detail at all
+32,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m04,5,5,4,correct one-sentence refusal
+33,nvidia/nemotron-3-ultra-550b-a55b:free,m13,5,5,5,says no more specific colour is available and notes multiple people
+34,google/gemma-4-26b-a4b-it:free,m09,5,5,5,times and bullets; vehicle details verified present in context
+35,google/gemma-4-26b-a4b-it:free,m08,5,5,4,merges [2] and [5] correctly but gives no times
+36,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m07,3,5,3,only 1 of 4 trucks
+37,nvidia/nemotron-3-ultra-550b-a55b:free,m11,5,5,5,"accurate, concise, groups sensibly"
+38,google/gemma-4-31b-it:free,m07,4,4,4,lists the van under 'trucks' though it names it a van
+39,google/gemma-4-26b-a4b-it:free,m04,5,5,4,correct one-sentence refusal
+40,google/gemma-4-31b-it:free,m12,3,3,3,"'it' throughout, asserting identity across events"
+41,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m10,1,2,1,"WRONG - says the person remained nearby then concludes 'unattended'. Self-contradictory, and a false positive on an abandoned-bag query"
+42,nvidia/nemotron-3-ultra-550b-a55b:free,m05,5,5,4,"correct, but references events without citing them"
+43,google/gemma-4-31b-it:free,m06,4,4,4,merges [2] and [4] as one event; defensible but they differ in behaviour
+44,google/gemma-4-26b-a4b-it:free,m07,4,4,4,"same van-under-trucks issue, more detail"
+45,nvidia/nemotron-3-ultra-550b-a55b:free,m14,5,5,5,"leads with closest match, groups the rest sensibly"
+46,google/gemma-4-31b-it:free,m08,2,5,1,TRUNCATED mid-sentence at 112 characters - unusable
+47,nvidia/nemotron-3-ultra-550b-a55b:free,m12,5,5,5,"challenges the question's premise, gives precise timing, and explicitly says whether it is the same vehicle cannot be determined"
+48,google/gemma-4-26b-a4b-it:free,m10,5,5,5,correct and concise with the reason
+49,nvidia/nemotron-3-ultra-550b-a55b:free,m02,5,5,5,explicitly separates bus from school and flags they are different days
+50,google/gemma-4-26b-a4b-it:free,m01,5,5,5,"complete, strictly chronological, most scannable"
+51,nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free,m05,5,5,3,correct but offers no evidence to check
+52,google/gemma-4-26b-a4b-it:free,m02,3,4,3,uses 'it' throughout - frames five vehicles at two locations as one
