@@ -18,11 +18,11 @@ from functools import lru_cache
 from qdrant_client import QdrantClient
 
 from rag import filters, llm, store
+from rag.config import TOP_K
 from rag.embed import Embedder
 
 log = logging.getLogger(__name__)
 
-TOP_K = 5
 
 # Hits below this cosine similarity are treated as unrelated and dropped.
 # Chosen from early testing: real matches scored ~0.72–0.82, a nonsense query

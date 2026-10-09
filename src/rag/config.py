@@ -28,6 +28,12 @@ QDRANT_LOCAL_PATH = PROJECT_ROOT / "qdrant_data"
 
 COLLECTION = os.environ.get("QDRANT_COLLECTION", "meva_events")
 
+# How many events a query returns, and how many the LLM sees as context.
+# Environment-driven so it can be tuned on a deployment without cutting a new
+# release. The retrieval evaluation found correct results almost always rank
+# first, so 5 is generous rather than tight.
+TOP_K = int(os.environ.get("TOP_K", "5"))
+
 # bge-base-en-v1.5 outputs 768-dim vectors. If you change the model you must
 # change the dimension to match and re-index from scratch — a collection's
 # vector size is fixed at creation.
