@@ -149,6 +149,17 @@ Leave `LLM_MODEL` empty to skip the LLM; answers fall back to a plain summary.
 Reasoning models spend tokens thinking before answering, so `max_tokens` is set
 generously (2000). Too low and they hit the cap mid-thought and return nothing.
 
+## Tuning how many results come back
+
+`TOP_K` (default 5) sets how many events a query returns, and how many the LLM
+sees as context. It is read from the environment, so a deployment can change it
+without a new release — set it in `.env` locally, or as an environment variable
+on the host.
+
+The retrieval evaluation found that a correct result almost always ranks first,
+so 5 is generous rather than tight. Raising it mostly adds context for the LLM
+to read, at proportional cost in tokens and latency.
+
 To try it without the backend: `uv run scripts/ask.py "your question"`.
 
 The backend installs this package straight from a git tag in its
