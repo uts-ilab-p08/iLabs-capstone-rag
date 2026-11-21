@@ -496,7 +496,7 @@ On the backend host, set `QDRANT_URL`, `QDRANT_API_KEY`, `LLM_MODEL`, `LLM_API_K
 | Maria Jose Bustamante | Evaluation lead. MEVA reference data, event matching, data audits and the first candidate retrieval question sets |
 | Saurabh Sabharwal | Evaluation (annotation QA). LLM-judge QA pipeline, rubric, temporal IoU, human-in-the-loop review |
 
-**Client:** Dr Ali Haidar · **Mentor:** Junaid Akram
+**External Mentor:** Dr Ali Haidar · **Mentor:** Junaid Akram
 
 ---
 
